@@ -1,0 +1,5 @@
+assets/
+archive.zip
+archive/
+*.pyc
+test.py
