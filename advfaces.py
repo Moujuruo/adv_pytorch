@@ -10,6 +10,7 @@ from torch.nn import functional as F
 import importlib.util
 import utils.utils as utils
 
+
 class AdvFaces(nn.Module):
     def __init__(self, config):
         super(AdvFaces, self).__init__()
@@ -23,6 +24,9 @@ class AdvFaces(nn.Module):
         spec.loader.exec_module(self.aux_matcher)
         self.aux_matcher_model = self.aux_matcher.InceptionResnetV1(pretrained='vggface2', device=self.device)
         
+        for param in self.aux_matcher_model.parameters():
+            param.requires_grad = False
+
         self.setup_network_model()
         
         # 设置优化器
@@ -43,13 +47,8 @@ class AdvFaces(nn.Module):
     def setup_network_model(self):
         self.generator = Generator().to(self.device)
         self.discriminator = NormalDiscriminator().to(self.device)
-
-    def load_aux_matcher(self):
-        self.aux_matcher.load_weights(self.aux_matcher_model, 'vggface2')
-        self.aux_matcher_model.eval()
         
     def forward(self, images, targets=None):
-        
         if self.mode == "target" and targets is not None:
             self.perturb, self.g_output = self.generator(images, targets)
         else:
@@ -57,59 +56,6 @@ class AdvFaces(nn.Module):
             
         return self.perturb, self.g_output
     
-    def compute_losses(self, images, targets=None):
-
-        d_real = self.discriminator(images)
-        d_fake = self.discriminator(self.g_output)
-
-        ## GAN LOSS ##
-        d_loss_real = F.binary_cross_entropy_with_logits(d_real, torch.ones_like(d_real))
-        d_loss_fake = F.binary_cross_entropy_with_logits(d_fake, torch.zeros_like(d_fake))
-        self.d_loss = d_loss_real + d_loss_fake
-
-        self.adv_loss = F.binary_cross_entropy_with_logits(d_fake, torch.ones_like(d_fake))
-
-        ## IDENTITY LOSS ##
-        with torch.no_grad():
-            self.fake_feat = self.aux_matcher_model(self.g_output)
-            if self.mode == "target":
-                self.real_feat = self.aux_matcher_model(targets)
-            else:
-                self.real_feat = self.aux_matcher_model(images)
-
-        if self.mode == "target":
-            identity_loss = torch.mean(
-                1.0 - (utils.cosine_pair_torch(self.fake_feat, self.real_feat) + 1.0) / 2.0
-            )
-        else:
-            identity_loss = torch.mean(
-                utils.cosine_pair_torch(self.fake_feat, self.real_feat) + 1.0
-            )
-        self.identity_loss = self.config.identity_loss_weight * identity_loss
-
-        ## perturbation LOSS ##
-        perturb_norm = torch.norm(self.perturb, p=2, dim=(1, 2, 3))
-        perturbation_loss = torch.mean(
-            torch.maximum(
-                perturb_norm - self.config.perturbation_threshold,
-                torch.zeros_like(perturb_norm)
-            )
-        )
-        self.perturbation_loss = self.config.perturbation_loss_weight * perturbation_loss
-
-        ## pixel loss ##
-        self.pixel_loss = self.config.pixel_loss_weight * F.l1_loss(self.g_output, images)
-
-        self.g_loss = self.adv_loss + self.identity_loss + self.perturbation_loss
-
-        return {
-            "d_loss": self.d_loss,
-            "g_loss": self.g_loss,
-            "adv_loss": self.adv_loss,
-            "identity_loss": self.identity_loss,
-            "perturbation_loss": self.perturbation_loss,
-            "pixel_loss": self.pixel_loss,
-        }
 
     
     def save_checkpoint(self, path):
@@ -137,25 +83,24 @@ class AdvFaces(nn.Module):
         num_images = images.shape[0]
         c, h, w = images.shape[1:]
 
-        result = np.ndarray((num_images, c, h, w), dtype=np.float32)
-        pertubations = np.ndarray((num_images, c, h, w), dtype=np.float32)
+        result = torch.empty((num_images, c, h, w), dtype=images.dtype, device=self.device)
+        pertubations = torch.empty((num_images, c, h, w), dtype=images.dtype, device=self.device)
 
         for start_idx in range(0, num_images, batch_size):
             end_idx = min(start_idx + batch_size, num_images)
 
-            im = torch.tensor(images[start_idx:end_idx]).to(self.device)
+            im = images[start_idx:end_idx].to(self.device)
 
             if self.mode == "target":
-                t = torch.tensor(targets[start_idx:end_idx]).to(self.device)
+                t = targets[start_idx:end_idx].to(self.device)
                 p, g = self.forward(im, t)
-
             else:
                 p, g = self.forward(im)
 
-            result[start_idx:end_idx] = g.cpu().numpy()
-            pertubations[start_idx:end_idx] = p.cpu().numpy()
+            result[start_idx:end_idx] = g
+            pertubations[start_idx:end_idx] = p
 
-        self.train()
+        # self.train()
 
         return result, pertubations
 
@@ -163,9 +108,8 @@ class AdvFaces(nn.Module):
     def aux_matcher_extract_feature(self, images, batch_size=512, bottelneck_layer=512, verbose=True):
         self.eval()
         num_images = images.shape[0]
-        c, h, w = images.shape[1:]
 
-        fake = np.ndarray((num_images, bottelneck_layer), dtype=np.float32)
+        fake = torch.empty((num_images, bottelneck_layer), dtype=torch.float32, device=self.device)
         start_time = time.time()
 
         for start_idx in range(0, num_images, batch_size):
@@ -177,13 +121,12 @@ class AdvFaces(nn.Module):
                 sys.stdout.flush()
             end_idx = min(start_idx + batch_size, num_images)
 
-            im = torch.tensor(images[start_idx:end_idx]).to(self.device)
+            im = images[start_idx:end_idx].to(self.device)
 
             f = self.aux_matcher_model(im)
 
-            fake[start_idx:end_idx] = f.cpu().numpy()
+            fake[start_idx:end_idx] = f
 
-        self.train()
 
         if verbose:
             print('\n')
@@ -194,7 +137,7 @@ class AdvFaces(nn.Module):
 if __name__ == '__main__':
 
     config = importlib.import_module('configs.default')
-    advfaces = AdvFaces(config, 10)
+    advfaces = AdvFaces(config)
 
     # 生成一个 [1*3*112*112] 的随机张量
     images = torch.randn(1, 3, 112, 112)

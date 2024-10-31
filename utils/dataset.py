@@ -21,7 +21,7 @@ class DataClass:
         indices_tmp = list(set(self.indices) - set([exception]))
         return np.random.choice(indices_tmp, num_samples_per_class, replace=False)
     
-class Dataset(Dataset):
+class MyDataset(Dataset):
     def __init__(self, path: Optional[str] = None, mode: Optional[str] = None, is_train: bool = True):
         self.DataClass = DataClass
         self.mode = mode
@@ -37,11 +37,13 @@ class Dataset(Dataset):
                 transforms.Resize((160, 160)),
                 transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
+                transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
             ])
         else:
             self.transform = transforms.Compose([
                 transforms.Resize((160, 160)),
                 transforms.ToTensor(),
+                transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
             ])
 
 

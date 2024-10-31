@@ -86,6 +86,8 @@ class Generator(nn.Module):
         )
 
     def forward(self, x, target=None):
+        input_image = x
+
         if target is not None:
             x = torch.cat([x, target], dim=1) 
 
@@ -103,7 +105,7 @@ class Generator(nn.Module):
 
         # perturb the output
         perturb = torch.clamp(x, -1.0, 1.0)
-        output = 2 * torch.clamp(perturb + (x + 1.0) / 2.0, 0, 1) - 1.0
+        output = 2 * torch.clamp(perturb + (input_image + 1.0) / 2.0, 0, 1) - 1.0
 
         return x, output
     

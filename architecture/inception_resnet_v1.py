@@ -200,12 +200,12 @@ class InceptionResnetV1(nn.Module):
             initialized. (default: {None})
         dropout_prob {float} -- Dropout probability. (default: {0.6})
     """
-    def __init__(self, pretrained=None, classify=False, num_classes=None, dropout_prob=0.6, bottleneck_layer_size=512, device=None):
+    def __init__(self, pretrained=None, classify=False, num_classes=None, dropout_prob=1.0, bottleneck_layer_size=512, device=None):
         super().__init__()
 
         # Set simple attributes
         # self.pretrained = pretrained
-        # self.classify = classify
+        self.classify = classify
         # self.num_classes = num_classes
 
         # if pretrained == 'vggface2':
@@ -259,8 +259,8 @@ class InceptionResnetV1(nn.Module):
         self.last_linear = nn.Linear(1792, 512, bias=False)
         self.last_bn = nn.BatchNorm1d(512, eps=0.001, momentum=0.1, affine=True)
         ####
-        self.bottleneck = nn.Linear(1792, bottleneck_layer_size, bias=False)
-        self.bottleneck_bn = nn.BatchNorm1d(bottleneck_layer_size, eps=0.001, momentum=0.1, affine=True)
+        # self.bottleneck = nn.Linear(1792, bottleneck_layer_size, bias=False)
+        # self.bottleneck_bn = nn.BatchNorm1d(bottleneck_layer_size, eps=0.001, momentum=0.1, affine=True)
 
         ####
         if pretrained is not None:
@@ -301,20 +301,20 @@ class InceptionResnetV1(nn.Module):
         x = self.repeat_3(x)
         x = self.block8(x)
         x = self.avgpool_1a(x)
-        x = self.dropout(x)
+        # x = self.dropout(x)
 
-        x = self.bottleneck(x.view(x.shape[0], -1))
-        x = self.bottleneck_bn(x)
-        x = F.normalize(x, p=2, dim=1)
-        return x
+        # x = self.bottleneck(x.view(x.shape[0], -1))
+        # x = self.bottleneck_bn(x)
+        # x = F.normalize(x, p=2, dim=1)
+        # return x
 
-        # x = self.last_linear(x.view(x.shape[0], -1))
+        x = self.last_linear(x.view(x.shape[0], -1))
         # x = self.last_bn(x)
         # if self.classify:
-        #     x = self.logits(x)
+            # x = self.logits(x)
         # else:
-        #     x = F.normalize(x, p=2, dim=1)
-        # return x
+            # x = F.normalize(x, p=2, dim=1)
+        return x
 
 
 def load_weights(mdl, name):
@@ -328,9 +328,9 @@ def load_weights(mdl, name):
     mdl.load_state_dict(model_dict, strict=False)
     
     # 初始化新的bottleneck层
-    nn.init.xavier_uniform_(mdl.bottleneck.weight)
-    nn.init.constant_(mdl.bottleneck_bn.weight, 1)
-    nn.init.constant_(mdl.bottleneck_bn.bias, 0)
+    # nn.init.xavier_uniform_(mdl.bottleneck.weight)
+    # nn.init.constant_(mdl.bottleneck_bn.weight, 1)
+    # nn.init.constant_(mdl.bottleneck_bn.bias, 0)
 
 if __name__ == '__main__':
     mdl = InceptionResnetV1(pretrained='vggface2')

@@ -3,12 +3,12 @@ import sys
 import numpy as np
 
 # compare every row of x1 with every row of x2
-def cosine_pair(x1, x2):
-    assert x1.shape == x2.shape
-    epison = 1e-8
-    x1 = x1 / (np.linalg.norm(x1, axis=1, keepdims=True) + epison)
-    x2 = x2 / (np.linalg.norm(x2, axis=1, keepdims=True) + epison)
-    return np.dot(x1, x2.T)
+# def cosine_pair(x1, x2):
+#     assert x1.shape == x2.shape
+#     epison = 1e-8
+#     x1 = x1 / (np.linalg.norm(x1, axis=1, keepdims=True) + epison)
+#     x2 = x2 / (np.linalg.norm(x2, axis=1, keepdims=True) + epison)
+#     return np.dot(x1, x2.T)
 
 import torch
 

@@ -7,7 +7,12 @@ import os
 import time
 from advfaces import AdvFaces
 import utils.utils as utils
-from utils.dataset import Dataset
+from utils.dataset import MyDataset
+import torch.nn.functional as F
+
+torch.manual_seed(42)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed_all(42)
 
 def success_rate(
     network,
@@ -27,22 +32,89 @@ def success_rate(
 
         gen_feats = network.aux_matcher_extract_feature(fakes)
 
-        scores_a_t = utils.cosine_pair(gen_feats, target_feats)
+        scores_a_t = utils.cosine_pair_torch(gen_feats, target_feats)
         if config.mode == 'target':
             sr = (sum(scores_a_t > config.aux_matcher_threshold) / len(scores_a_t)) * 100
         else:
             sr = (sum(scores_a_t <= config.aux_matcher_threshold) / len(scores_a_t)) * 100
         print(f"Success Rate: {sr}%")
-        print("Mean Sim. Score (adv v. target): {}", format(np.mean(scores_a_t)))
+        print("Mean Sim. Score (adv v. target): {}", format(torch.mean(scores_a_t)))
         with open(log_dir + "/accuracy.txt", "a") as f:
             f.write("{}: {}\n".format(sr, step))
     network.train()  
-    return sr, np.mean(scores_a_t)
+    return sr, torch.mean(scores_a_t)
+
+def train_step(images, targets, network):
+    # 训练判别器
+    network.d_optimizer.zero_grad()
+    
+    # 前向传播
+    perturb, g_output = network(images, targets)
+    
+    # 计算判别器损失
+    d_real = network.discriminator(images)
+    d_fake = network.discriminator(g_output.detach())  # 注意这里使用detach()
+    
+    d_loss_real = F.binary_cross_entropy_with_logits(d_real, torch.ones_like(d_real))
+    d_loss_fake = F.binary_cross_entropy_with_logits(d_fake, torch.zeros_like(d_fake))
+    d_loss = d_loss_real + d_loss_fake
+    
+    d_loss.backward()
+    network.d_optimizer.step()
+
+    # 训练生成器
+    network.g_optimizer.zero_grad()
+    
+    # 重新计算生成器的损失
+    d_fake = network.discriminator(g_output)  # 注意这里不使用detach()
+    adv_loss = F.binary_cross_entropy_with_logits(d_fake, torch.ones_like(d_fake))
+    
+    # 计算其他损失
+    fake_feat = network.aux_matcher_model(g_output)
+    if network.mode == "target":
+        real_feat = network.aux_matcher_model(targets)
+        identity_loss = torch.mean(
+            1.0 - (utils.cosine_pair_torch(fake_feat, real_feat) + 1.0) / 2.0
+        )
+    else:
+        real_feat = network.aux_matcher_model(images)
+        identity_loss = torch.mean(
+            utils.cosine_pair_torch(fake_feat, real_feat) + 1.0
+        )
+    identity_loss = network.config.identity_loss_weight * identity_loss
+
+    perturb_norm = torch.norm(perturb, p=2, dim=(1, 2, 3))
+    perturbation_loss = torch.mean(
+        torch.maximum(
+            perturb_norm,
+            torch.full_like(perturb_norm, network.config.perturbation_threshold)
+        )
+    )
+    perturbation_loss = network.config.perturbation_loss_weight * perturbation_loss
+    
+    pixel_loss = network.config.pixel_loss_weight * F.l1_loss(g_output, images)
+    
+    g_loss = adv_loss + identity_loss + perturbation_loss + pixel_loss
+    
+    # 生成器反向传播
+    g_loss.backward()
+    
+            
+    network.g_optimizer.step()
+    
+    return {
+        "d_loss": d_loss.item(),
+        "g_loss": g_loss.item(),
+        "adv_loss": adv_loss.item(),
+        "identity_loss": identity_loss.item(),
+        "perturbation_loss": perturbation_loss.item(),
+        "pixel_loss": pixel_loss.item()
+    }
 
 if __name__ == "__main__":
     config = importlib.import_module("configs.default")
-    trainset = Dataset(config.train_dataset_path, config.mode)
-    testset = Dataset(config.test_dataset_path, config.mode, is_train=False)
+    trainset = MyDataset(config.train_dataset_path, config.mode)
+    testset = MyDataset(config.test_dataset_path, config.mode, is_train=False)
 
     train_loader = DataLoader(trainset, batch_size=config.batch_size, shuffle=True, drop_last=True) 
     test_loader = DataLoader(testset, batch_size=config.batch_size, shuffle=False, drop_last=True)   
@@ -64,7 +136,7 @@ if __name__ == "__main__":
     for epoch in range(config.num_epochs):
         if epoch == 0:
             print("Loading Test Set")
-            originals, targets, labels = next(iter(test_loader))  # 获取标签
+            originals, targets, labels = next(iter(test_loader))  
             originals = originals.to(network.device)
             targets = targets.to(network.device)
             labels = labels.to(network.device)  
@@ -82,20 +154,9 @@ if __name__ == "__main__":
             images, targets, labels = batch[0].to(network.device), \
                                       batch[1].to(network.device), \
                                       batch[2].to(network.device)
-            
-            learning_rate = utils.get_updated_learning_rate(global_step, config)
-            
-            network.g_optimizer.zero_grad()
-            network.d_optimizer.zero_grad()
+            wl = train_step(images, targets, network)
 
-            # Forward pass and compute losses
-            wl = network.compute_losses(images, targets)
             
-            # Backward pass
-            wl["g_loss"].backward(retain_graph=True)
-            network.g_optimizer.step()
-            wl["d_loss"].backward()
-            network.d_optimizer.step()
 
             # Display and logging
             if step % config.summary_interval == 0:

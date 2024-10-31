@@ -3,3 +3,9 @@ archive.zip
 archive/
 *.pyc
 test.py
+logs/
+
+logs/obfuscation/accuracy.txt
+
+train_test*
+tempCodeRunnerFile.py
