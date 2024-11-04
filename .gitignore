@@ -9,3 +9,5 @@ logs/obfuscation/accuracy.txt
 
 train_test*
 tempCodeRunnerFile.py
+output.jpg
+logs/obfuscation/accuracy.txt

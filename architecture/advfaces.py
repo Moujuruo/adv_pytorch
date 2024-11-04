@@ -4,13 +4,13 @@ import torch.nn.functional as F
 
 import torch.nn.init as init
 
-def weights_init_normal(m):
-    classname = m.__class__.__name__
-    if classname.find('Conv') != -1:
-        init.normal_(m.weight.data, 0.0, 0.02)
-    elif classname.find('BatchNorm') != -1 or classname.find('InstanceNorm') != -1:
-        init.normal_(m.weight.data, 1.0, 0.02)
-        init.constant_(m.bias.data, 0.0)
+# def weights_init_normal(m):
+#     classname = m.__class__.__name__
+#     if classname.find('Conv') != -1:
+#         init.normal_(m.weight.data, 0.0, 0.02)
+#     elif classname.find('BatchNorm') != -1 or classname.find('InstanceNorm') != -1:
+#         init.normal_(m.weight.data, 1.0, 0.02)
+#         init.constant_(m.bias.data, 0.0)
 
 class ResidualBlock(nn.Module):
     def __init__(self, in_features):
@@ -32,7 +32,7 @@ class ResidualBlock(nn.Module):
 class Generator(nn.Module):
     def __init__(self, in_channels=3, base_channels=64, use_dropout=False):
         super(Generator, self).__init__()
-        self.apply(weights_init_normal)
+        # self.apply(weights_init_normal)
 
         self.k = base_channels 
 
@@ -67,7 +67,7 @@ class Generator(nn.Module):
             nn.ReflectionPad2d(2),
             nn.Conv2d(4*self.k, 2*self.k, 5),
             # nn.LayerNorm(2*self.k),
-            nn.GroupNorm(32, 2*self.k),
+            nn.GroupNorm(1, 2*self.k),
             nn.ReLU(inplace=True),
         )
 
@@ -76,7 +76,7 @@ class Generator(nn.Module):
             nn.ReflectionPad2d(2),
             nn.Conv2d(2*self.k, self.k, 5),
             # nn.LayerNorm(self.k),
-            nn.GroupNorm(32, self.k),
+            nn.GroupNorm(1, self.k),
             nn.ReLU(inplace=True),
         )
 
@@ -110,36 +110,31 @@ class Generator(nn.Module):
         return x, output
     
 class NormalDiscriminator(nn.Module):
-    def __init__(self, in_channels=3, dropout_rate=0.0):
+    def __init__(self, in_channels=3, dropout_rate=0.0, phase_train=True):
         super(NormalDiscriminator, self).__init__()
-        self.apply(weights_init_normal)
-
-        def discriminator_block(in_channels, out_channels, kernel_size=4, stride=2, normalize=True):
+        self.phase_train = phase_train
+        
+        def discriminator_block(in_channels, out_channels, kernel_size=4, stride=2, normalize=True, activation=True):
             layers = [
-                nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding=1, bias=not normalize)
+                nn.ReflectionPad2d(1),
+                nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding=0, bias=not normalize)
             ]
             if normalize:
-                layers.append(nn.BatchNorm2d(out_channels))
-            layers.append(nn.LeakyReLU(0.2, inplace=True))
-
+                layers.append(nn.BatchNorm2d(out_channels, track_running_stats=phase_train))
+            if activation:
+                layers.append(nn.LeakyReLU(0.2, inplace=True))
             return layers
         
         self.model = nn.Sequential(
-            *discriminator_block(in_channels, 32, normalize=False),
-            *discriminator_block(32, 64),
-            *discriminator_block(64, 128),
-            *discriminator_block(128, 256),
-            *discriminator_block(256, 512),
+            *discriminator_block(in_channels, 32, normalize=True, activation=False),
+            *discriminator_block(32, 64, normalize=True, activation=False),
+            *discriminator_block(64, 128, normalize=True, activation=True),
+            *discriminator_block(128, 256, normalize=True, activation=True),
+            *discriminator_block(256, 512, normalize=True, activation=True),
             nn.Conv2d(512, 1, kernel_size=1, stride=1, padding=0)
         )
 
-    def forward(self, x, train=True):
-        if train:
-            self.train()
-        else:
-            self.eval()
-
-        output = self.model(x)
-        output = output.view(x.size(0), -1) # [B, 1]
-        return output
-            
+    def forward(self, x):
+        batch_size = x.size(0)
+        out = self.model(x)
+        return out.view(batch_size, -1)

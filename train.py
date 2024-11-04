@@ -53,7 +53,7 @@ def train_step(images, targets, network):
     
     # 计算判别器损失
     d_real = network.discriminator(images)
-    d_fake = network.discriminator(g_output.detach())  # 注意这里使用detach()
+    d_fake = network.discriminator(g_output.detach())  
     
     d_loss_real = F.binary_cross_entropy_with_logits(d_real, torch.ones_like(d_real))
     d_loss_fake = F.binary_cross_entropy_with_logits(d_fake, torch.zeros_like(d_fake))
@@ -65,8 +65,7 @@ def train_step(images, targets, network):
     # 训练生成器
     network.g_optimizer.zero_grad()
     
-    # 重新计算生成器的损失
-    d_fake = network.discriminator(g_output)  # 注意这里不使用detach()
+    d_fake = network.discriminator(g_output)  
     adv_loss = F.binary_cross_entropy_with_logits(d_fake, torch.ones_like(d_fake))
     
     # 计算其他损失
@@ -79,7 +78,7 @@ def train_step(images, targets, network):
     else:
         real_feat = network.aux_matcher_model(images)
         identity_loss = torch.mean(
-            utils.cosine_pair_torch(fake_feat, real_feat) + 1.0
+            utils.cosine_pair_torch(fake_feat, real_feat)
         )
     identity_loss = network.config.identity_loss_weight * identity_loss
 
@@ -94,12 +93,10 @@ def train_step(images, targets, network):
     
     pixel_loss = network.config.pixel_loss_weight * F.l1_loss(g_output, images)
     
-    g_loss = adv_loss + identity_loss + perturbation_loss + pixel_loss
+    g_loss = adv_loss + identity_loss + perturbation_loss
     
-    # 生成器反向传播
     g_loss.backward()
-    
-            
+
     network.g_optimizer.step()
     
     return {
@@ -155,8 +152,6 @@ if __name__ == "__main__":
                                       batch[1].to(network.device), \
                                       batch[2].to(network.device)
             wl = train_step(images, targets, network)
-
-            
 
             # Display and logging
             if step % config.summary_interval == 0:

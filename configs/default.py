@@ -37,11 +37,11 @@ epoch_size = 200
 # Number of epochs
 num_epochs = 500
 
-identity_loss_weight = 10.0
+identity_loss_weight = 6.0
 
 perturbation_threshold = 3.0
 
-perturbation_loss_weight = 1.0
+perturbation_loss_weight = 3.0
 
 pixel_loss_weight = 1.0
 
