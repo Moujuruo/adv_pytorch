@@ -34,14 +34,14 @@ class MyDataset(Dataset):
        
         if is_train:
             self.transform = transforms.Compose([
-                transforms.Resize((160, 160)),
+                transforms.Resize((112, 112)),
                 transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
                 transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
             ])
         else:
             self.transform = transforms.Compose([
-                transforms.Resize((160, 160)),
+                transforms.Resize((112, 112)),
                 transforms.ToTensor(),
                 transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
             ])

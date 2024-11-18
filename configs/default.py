@@ -2,13 +2,16 @@ import os
 import sys
 
 
-mode = 'obfuscation'
+mode = 'target'
 
 
-aux_matcher_definition = 'architecture/inception_resnet_v1.py'
-# aux_matcher_path = 'pretrained/facenet/model-20180402-114759.ckpt-275'
-aux_matcher_path = 'assets/20180402-114759-vggface2.pt'
-aux_matcher_scope = 'InceptionResnetV1'
+# aux_matcher_definition = 'architecture/inception_resnet_v1.py'
+# aux_matcher_path = 'assets/20180402-114759-vggface2.pt'
+# aux_matcher_scope = 'InceptionResnetV1'
+aux_matcher_definition = 'architecture/iresnet.py'
+aux_matcher_path = 'assets/model.pt'
+
+
 # Matching Threshold. !!!!  CAREFUL -- By default, we assume scores are un-normalized between [-1, 1]
 aux_matcher_threshold = 0.45	
 

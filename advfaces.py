@@ -1,6 +1,6 @@
 import sys
 import time
-from architecture.advfaces import Generator, NormalDiscriminator
+from architecture.advfaces import Generator, NormalDiscriminator, ImprovedGenerator
 
 import torch
 import torch.nn as nn
@@ -22,7 +22,12 @@ class AdvFaces(nn.Module):
         spec = importlib.util.spec_from_file_location("network_model", config.aux_matcher_definition)
         self.aux_matcher = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(self.aux_matcher)
-        self.aux_matcher_model = self.aux_matcher.InceptionResnetV1(pretrained='vggface2', device=self.device)
+        if "inception" in config.aux_matcher_definition:
+            self.aux_matcher_model = self.aux_matcher.InceptionResnetV1(pretrained='vggface2', device=self.device)
+        else:
+            print("=============================================================")
+            self.aux_matcher_model = self.aux_matcher.get_model('r50').eval().to(self.device)
+            # print(self.aux_matcher_model)
         
         for param in self.aux_matcher_model.parameters():
             param.requires_grad = False
@@ -45,8 +50,11 @@ class AdvFaces(nn.Module):
         self.global_step = 0
         
     def setup_network_model(self):
-        self.generator = Generator().to(self.device)
-        self.discriminator = NormalDiscriminator().to(self.device)
+        if self.mode == "target":
+            self.generator = ImprovedGenerator(use_target=True)
+        else:
+            self.generator = ImprovedGenerator()
+        self.discriminator = NormalDiscriminator()
         
     def forward(self, images, targets=None):
         if self.mode == "target" and targets is not None:
@@ -145,7 +153,7 @@ if __name__ == '__main__':
     perturb, g_output = advfaces(images)
     print(perturb, g_output)
 
-    print(advfaces.compute_losses(images))
+    # print(advfaces.compute_losses(images))
 
 
 
