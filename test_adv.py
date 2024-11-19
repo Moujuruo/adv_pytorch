@@ -28,21 +28,17 @@ state_dict = torch.load('logs/target/model_epoch_88.pth')
 network.load_state_dict(state_dict, strict=False)
 
 # 比较加载完的模型和原始模型的参数
-for key in network.aux_matcher_model.state_dict():
-    if key in state_dict:
-        if not torch.equal(aux_matcher_state_dict[key], state_dict[key]):
-            print(f"Key: {key} is not equal")
+# for key in network.aux_matcher_model.state_dict():
+#     if key in state_dict:
+#         if not torch.equal(aux_matcher_state_dict[key], state_dict[key]):
+#             print(f"Key: {key} is not equal")
 
-state_dict = torch.load('logs/target/model_epoch_499.pth') 
-network.load_state_dict(state_dict, strict=False)
-for key in network.aux_matcher_model.state_dict():
-    if key in state_dict:
-        if not torch.equal(aux_matcher_state_dict[key], state_dict[key]):
-            print(f"Key: {key} is not equal")
-
-
-
-
+# state_dict = torch.load('logs/target/model_epoch_499.pth') 
+# network.load_state_dict(state_dict, strict=False)
+# for key in network.aux_matcher_model.state_dict():
+#     if key in state_dict:
+#         if not torch.equal(aux_matcher_state_dict[key], state_dict[key]):
+#             print(f"Key: {key} is not equal")
 
 
 network.eval()

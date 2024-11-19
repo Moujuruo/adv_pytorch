@@ -2,7 +2,7 @@ import os
 import sys
 
 
-mode = 'target'
+mode = 'obfuscation'
 
 
 # aux_matcher_definition = 'architecture/inception_resnet_v1.py'

@@ -11,3 +11,6 @@ train_test*
 tempCodeRunnerFile.py
 output.jpg
 logs/obfuscation/accuracy.txt
+advimages*
+comparison*
+images_*
