@@ -1,0 +1,29 @@
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Training logs and generated results
+logs/*
+!logs/.gitkeep
+result_data/*
+!result_data/.gitkeep
+
+# Model weights / checkpoints
+model/assets/*.pt
+model/assets/*.pth
+model/assets/*.ckpt
+model/assets/*.bin
+model/assets/*.onnx
+model/assets/*.safetensors
+model/assets/obfuscation/*
+!model/assets/obfuscation/.gitkeep
+model/assets/target/*
+!model/assets/target/.gitkeep
+
+# Local archives
+model/assets/*.zip
